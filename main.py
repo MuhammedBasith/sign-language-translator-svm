@@ -4,29 +4,25 @@ import joblib
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
-from textblob import Word
-from symspellpy import SymSpell, Verbosity
-import pyttsx3
+import os
+import pygame
 
-# Initialize speech engine
-engine = pyttsx3.init()
+# Initialize pygame mixer
+pygame.mixer.init()
 
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
-sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
-sym_spell.load_dictionary("./frequency_dictionary_en_82_765.txt", term_index=0, count_index=1)
 
 hands = mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.5)
 
+# Load the pre-trained SVM model
 clf = joblib.load('svm_model.pkl')
+
+# Path to the folder containing pre-generated audio files
+audio_folder = "alphabets"
 
 # Variable to store last predicted letter
 last_predicted_letter = None
-
-def correct_spelling(word):
-    suggestions = sym_spell.lookup(word, Verbosity.CLOSEST, max_edit_distance=2)
-    return suggestions[0].term if suggestions else word
 
 def data_clean(landmark):
     data = landmark[0]
@@ -44,11 +40,13 @@ def data_clean(landmark):
     except:
         return np.zeros([1, 63], dtype=int)[0]
 
-def speak_letter(letter):
+def play_audio(letter):
     global last_predicted_letter
     if letter != last_predicted_letter:
-        engine.say(f"The predicted letter is {letter}")
-        engine.runAndWait()
+        file_path = os.path.join(audio_folder, f"{letter}.mp3")
+        if os.path.exists(file_path):
+            pygame.mixer.music.load(file_path)
+            pygame.mixer.music.play()
         last_predicted_letter = letter
 
 def predict_image(image_path):
@@ -61,7 +59,6 @@ def predict_image(image_path):
         if cleaned_landmark:
             y_pred = clf.predict(cleaned_landmark)
             letter = y_pred[0]
-            speak_letter(letter)  # Speak the letter
             messagebox.showinfo("Prediction", f"The predicted letter is: {letter}")
     else:
         messagebox.showinfo("Prediction", "No hand detected in the image.")
@@ -93,15 +90,14 @@ def predict_real_time():
 
             cleaned_landmark = data_clean(results.multi_hand_landmarks)
             if cleaned_landmark:
-                clf = joblib.load('svm_model.pkl')
                 y_pred = clf.predict(cleaned_landmark)
                 letter = y_pred[0]
-                speak_letter(letter)  # Speak only if it's a new letter
+                play_audio(letter)  # Play audio for the predicted letter
                 image = cv2.putText(image, str(letter), (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 2, cv2.LINE_AA)
 
         cv2.imshow('Real-Time Prediction', image)
 
-        if cv2.waitKey(5) & 0xFF == 27:
+        if cv2.waitKey(5) & 0xFF == 27:  # Press 'Esc' to exit
             break
 
     cap.release()
