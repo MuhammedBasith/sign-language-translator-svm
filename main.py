@@ -36,6 +36,8 @@ letter_hold_time = 0.5  # seconds to hold a letter to lock it
 word_pause_time = 2.0  # seconds of no new letters to read the word
 last_word_update_time = 0
 is_speaking = False
+speech_cooldown = 3.0  # seconds to wait before allowing next speech
+last_speech_time = 0
 
 def data_clean(landmark):
     data = landmark[0]
@@ -63,20 +65,23 @@ def play_audio(letter):
         last_predicted_letter = letter
 
 def speak_word(word):
-    global is_speaking
-    if word and not is_speaking:
+    global is_speaking, last_speech_time
+    current_time = time.time()
+    if word and not is_speaking and (current_time - last_speech_time) >= speech_cooldown:
         is_speaking = True
         engine.say(word)
         engine.runAndWait()
         is_speaking = False
+        last_speech_time = current_time
 
 def reset_word():
-    global current_word, last_predicted_letter, last_letter_time, last_word_update_time, is_speaking
+    global current_word, last_predicted_letter, last_letter_time, last_word_update_time, is_speaking, last_speech_time
     current_word = ""
     last_predicted_letter = None
     last_letter_time = 0
     last_word_update_time = 0
     is_speaking = False
+    last_speech_time = 0
 
 def predict_image(image_path):
     image = cv2.imread(image_path)
@@ -98,12 +103,13 @@ def upload_image():
         predict_image(file_path)
 
 def predict_real_time():
-    global last_predicted_letter, current_word, last_letter_time, last_word_update_time, is_speaking
+    global last_predicted_letter, current_word, last_letter_time, last_word_update_time, is_speaking, last_speech_time
     last_predicted_letter = None
     current_word = ""
     last_letter_time = 0
     last_word_update_time = 0
     is_speaking = False
+    last_speech_time = 0
     
     cap = cv2.VideoCapture(0)
     while cap.isOpened():
@@ -178,54 +184,39 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         
-        # Create buttons
-        upload_image_btn = QPushButton("Upload Image")
-        upload_image_btn.setFixedSize(200, 50)
-        upload_image_btn.clicked.connect(upload_image)
-        upload_image_btn.setStyleSheet("""
+        # Create buttons with improved visibility
+        button_style = """
             QPushButton {
-                background-color: #f0f0f0;
+                background-color: #4CAF50;
+                color: white;
                 border: none;
                 border-radius: 5px;
                 padding: 10px;
                 font-size: 14px;
+                font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #d1d1d1;
+                background-color: #45a049;
             }
-        """)
+            QPushButton:pressed {
+                background-color: #3d8b40;
+            }
+        """
+        
+        upload_image_btn = QPushButton("Upload Image")
+        upload_image_btn.setFixedSize(200, 50)
+        upload_image_btn.clicked.connect(upload_image)
+        upload_image_btn.setStyleSheet(button_style)
         
         real_time_btn = QPushButton("Predict in Real-Time")
         real_time_btn.setFixedSize(200, 50)
         real_time_btn.clicked.connect(predict_real_time)
-        real_time_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                border: none;
-                border-radius: 5px;
-                padding: 10px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #d1d1d1;
-            }
-        """)
+        real_time_btn.setStyleSheet(button_style)
         
         reset_btn = QPushButton("Reset Word")
         reset_btn.setFixedSize(200, 50)
         reset_btn.clicked.connect(reset_word)
-        reset_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f0f0f0;
-                border: none;
-                border-radius: 5px;
-                padding: 10px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #d1d1d1;
-            }
-        """)
+        reset_btn.setStyleSheet(button_style)
         
         # Add buttons to layout
         layout.addWidget(upload_image_btn, alignment=Qt.AlignCenter)
